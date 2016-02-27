@@ -1,5 +1,7 @@
 package ex1
 
+import java.util.concurrent.atomic.AtomicReference
+
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.pattern.{CircuitBreaker, ask, pipe}
 import akka.util.Timeout
