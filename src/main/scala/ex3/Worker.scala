@@ -2,7 +2,7 @@ package ex3
 
 import akka.actor._
 import ex3.RootActor.Start
-import ex3.Worker.Increment
+import ex3.Worker._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -24,13 +24,13 @@ object RootActor {
 }
 
 class RootActor(topics: Seq[String]) extends Actor {
-  val propsForActorName =  topics.map { t => Worker.name(t) -> Worker.props(t) }.toMap
+  val propsForActorName = topics.map { t => Worker.name(t) -> Worker.props(t) }.toMap
 
   override def supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   def receive = {
     case Start =>
-      propsForActorName.foreach { case (t, p) =>
+      propsForActorName.map { case (t, p) =>
         context.watch(context.actorOf(p, t))
       }
     case Terminated(ref: ActorRef) =>
@@ -43,17 +43,26 @@ class RootActor(topics: Seq[String]) extends Actor {
 }
 
 object Worker {
+  case object Connect
   private case object Increment
+
+  sealed trait State
+  case object Connecting extends State
+  case object Connected extends State
+
+  case class Data(i: Int)
+
   def name(topic: String) = s"consumer-$topic"
+
   def props(topic: String) = Props(classOf[Worker], topic)
 }
 
-class Worker(topic: String) extends Actor {
-  var i = 0
+class Worker(topic: String) extends FSM[State, Data] {
   val cancel = context.system.scheduler.schedule(0.seconds, (Random.nextInt() % 200).milliseconds, self, Increment)(context.dispatcher)
 
   override def preStart() = {
     super.preStart()
+    self ! Connect
   }
 
   override def postStop() = {
@@ -69,11 +78,26 @@ class Worker(topic: String) extends Actor {
     super.postRestart(reason)
   }
 
-  def receive = {
-    case Increment =>
-      i = i + 1
-      self ! i
-    case 4 if topic == "mebaru" => throw new RuntimeException("接続切れた")
-    case x => println(topic + " => " + x)
+  startWith(Connecting, Data(0))
+
+  when(Connecting) {
+    case Event(Increment, d) =>
+      println("ignoring") // send nack
+      stay()
+    case Event(Connect, d) =>
+      Thread.sleep(1000) // throw exception when timeout
+      goto(Connected)
+  }
+
+  when(Connected) {
+    case Event(Increment, d) =>
+      self ! d.i
+      stay() using d.copy(i = d.i + 1)
+    case Event(4, d) if topic == "mebaru" =>
+      throw new RuntimeException("接続切れた")
+      stay()
+    case Event(i, d) =>
+      println(topic + " => " + i)
+      stay()
   }
 }
