@@ -11,5 +11,6 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
-  "com.typesafe.akka" %% "akka-contrib" % akkaVersion
+  "com.typesafe.akka" %% "akka-contrib" % akkaVersion,
+  "com.typesafe.akka" %% "akka-typed-experimental" % akkaVersion
 )
